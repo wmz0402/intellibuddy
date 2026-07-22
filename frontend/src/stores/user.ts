@@ -279,8 +279,13 @@ export const useUserStore = defineStore('user', {
             console.log('  📋 store.token:', this.token ? '存在' : '不存在');
             
             if (this.token) {
-                console.log('✅ [tryLoginFromLocalStorage] Token 存在，开始加载数据');
-                await this.fetchInitialData();
+                try {
+                    console.log('✅ [tryLoginFromLocalStorage] Token 存在，开始加载数据');
+                    await this.fetchInitialData();
+                } catch (err) {
+                    console.warn('⚠️ [tryLoginFromLocalStorage] 登录凭证无效或已过期，清除登录状态:', err);
+                    this.logout();
+                }
             } else {
                 console.warn('⚠️ [tryLoginFromLocalStorage] Token 不存在，跳过登录恢复');
             }

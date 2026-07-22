@@ -56,8 +56,10 @@ console.log('✅ [main.ts] 设置已加载');
 
 // 使用 .then() 代替 top-level await 以支持更多浏览器
 console.log('🔄 [main.ts] 开始尝试从 localStorage 恢复登录');
-userStore.tryLoginFromLocalStorage().then(() => {
-    console.log('✅ [main.ts] 登录恢复完成');
+userStore.tryLoginFromLocalStorage().catch(err => {
+    console.warn('⚠️ [main.ts] 登录恢复异常:', err);
+}).finally(() => {
+    console.log('✅ [main.ts] 登录恢复完成或中断处理');
     console.log('  📋 最终登录状态:', userStore.isLoggedIn);
     console.log('  👤 最终用户信息:', userStore.user);
     
