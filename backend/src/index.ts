@@ -87,6 +87,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // --- 响应压缩（gzip）---
 app.use(compression({
