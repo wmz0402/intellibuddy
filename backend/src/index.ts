@@ -78,9 +78,10 @@ if (!mongoUri) {
 
 // --- CORS 配置 ---
 const corsOptions = {
-    origin: process.env.ALLOWED_ORIGINS 
-        ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-        : '*',
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // 允许所有来源（包含 Cloudflare 自定义域名及跨域凭证请求）
+        callback(null, true);
+    },
     credentials: true,
     optionsSuccessStatus: 200
 };
