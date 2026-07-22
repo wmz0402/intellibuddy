@@ -76,20 +76,21 @@ if (!mongoUri) {
         });
 }
 
-// --- 全局 CORS 与 OPTIONS 预检请求拦截中间件 ---
+// --- Vercel URL 重建规范化与全局 OPTIONS 预检处理 ---
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const origin = req.headers.origin;
-    if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-    } else {
-        res.setHeader('Access-Control-Allow-Origin', '*');
+    // 恢复由 Vercel 重写影响的原始请求 URL
+    if (req.url.startsWith('/api/index')) {
+        req.url = req.url.replace('/api/index', '/api');
     }
+
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Api-Version');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        return res.status(200).send('OK');
     }
     next();
 });
