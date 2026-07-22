@@ -3,6 +3,8 @@
  * 为每个知识点添加测验题目
  */
 
+import dns from 'dns';
+try { dns.setServers(['223.5.5.5', '8.8.8.8']); } catch {}
 import mongoose from 'mongoose';
 import KnowledgePoint, { IQuizQuestion } from './models/KnowledgePoint';
 import dotenv from 'dotenv';

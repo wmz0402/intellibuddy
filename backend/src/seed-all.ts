@@ -1,3 +1,5 @@
+import dns from 'dns';
+try { dns.setServers(['223.5.5.5', '8.8.8.8']); } catch {}
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import KnowledgePoint from './models/KnowledgePoint';

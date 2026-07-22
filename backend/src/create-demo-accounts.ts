@@ -19,6 +19,8 @@
 // 版本: v2.2.0
 // 最后更新: 2025-10-26
 
+import dns from 'dns';
+try { dns.setServers(['223.5.5.5', '8.8.8.8']); } catch {}
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
