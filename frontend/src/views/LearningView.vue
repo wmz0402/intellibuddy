@@ -194,7 +194,36 @@ import QuizPanel from '@/components/QuizPanel.vue';
 import {apiUpdateProgress, apiGetKnowledgePointDetail} from '@/services/apiService';
 import {useAIIntervention} from '@/composables/useAIIntervention';
 import {useStudyTimer} from '@/composables/useStudyTimer';
-import type {KnowledgePoint} from '@/stores/knowledge';
+import type {KnowledgePoint, ContentFile} from '@/stores/knowledge';
+import {getContentFilesForKnowledgePoint} from '@/config/contentFilesConfig';
+
+// 从随前端打包部署的静态目录抓取 Markdown 笔记
+const fetchStaticContentFiles = async (kpId: string): Promise<ContentFile[]> => {
+  const fileConfigs = getContentFilesForKnowledgePoint(kpId);
+  if (!fileConfigs || fileConfigs.length === 0) {
+    return [];
+  }
+
+  const results: ContentFile[] = [];
+  for (const config of fileConfigs) {
+    try {
+      const publicPath = config.path.replace(/^public\//, '/');
+      const response = await fetch(encodeURI(publicPath));
+      if (response.ok) {
+        const text = await response.text();
+        if (text && text.trim()) {
+          results.push({
+            title: config.title,
+            content: text
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`读取打包的静态笔记失败: ${config.path}`, err);
+    }
+  }
+  return results;
+};
 
 // 配置 marked 以支持代码高亮
 const renderer = new marked.Renderer();
@@ -679,16 +708,42 @@ onBeforeRouteUpdate((to, from) => {
   }
 });
 
-// 加载知识点详情（包含完整内容）
+// 加载知识点详情（优先 API，若数据库无内容或请求失败，自动读取随前端打包部署的静态 Markdown 笔记）
 const loadKnowledgePointDetail = async (id: string) => {
   if (!id) return;
   
   isLoadingDetail.value = true;
   try {
-    knowledgePointDetail.value = await apiGetKnowledgePointDetail(id);
+    const detail = await apiGetKnowledgePointDetail(id);
+    const hasFiles = detail && detail.contentFiles && detail.contentFiles.length > 0;
+    const hasSingleContent = detail && detail.content && detail.content.trim().length > 0;
+
+    if (hasFiles || hasSingleContent) {
+      knowledgePointDetail.value = detail;
+    } else {
+      // 数据库中暂无笔记内容时，自动抓取打包部署在前端的 Markdown 笔记
+      const staticFiles = await fetchStaticContentFiles(id);
+      if (staticFiles.length > 0) {
+        knowledgePointDetail.value = {
+          ...detail,
+          contentFiles: staticFiles
+        };
+      } else {
+        knowledgePointDetail.value = detail;
+      }
+    }
   } catch (error) {
-    console.error('加载知识点详情失败:', error);
-    knowledgePointDetail.value = null;
+    console.error('加载知识点 API 失败，尝试读取随前端打包部署的静态笔记:', error);
+    const staticFiles = await fetchStaticContentFiles(id);
+    const point = knowledgeStore.pointsAsArrayWithProgress.find(p => p.id === id);
+    if (staticFiles.length > 0 && point) {
+      knowledgePointDetail.value = {
+        ...point,
+        contentFiles: staticFiles
+      };
+    } else {
+      knowledgePointDetail.value = null;
+    }
   } finally {
     isLoadingDetail.value = false;
   }
