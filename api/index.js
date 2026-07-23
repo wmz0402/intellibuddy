@@ -3658,6 +3658,104 @@ var ZhipuProvider = class extends AIModelProvider {
   }
 };
 
+// src/services/ai-models/spark.ts
+var import_axios5 = __toESM(require("axios"));
+var SparkProvider = class extends AIModelProvider {
+  constructor(appId, apiKey, apiSecret, modelName = "generalv3.5") {
+    super(apiKey, "https://spark-api-open.xf-yun.com/v1/chat/completions", modelName);
+    this.appId = appId;
+    this.apiSecret = apiSecret;
+  }
+  async chatCompletion(messages, options = {}) {
+    const { temperature = 0.7, maxTokens = 2e3 } = options;
+    try {
+      const response = await import_axios5.default.post(
+        this.baseURL,
+        {
+          model: this.modelName,
+          messages,
+          temperature,
+          max_tokens: maxTokens
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.apiKey}:${this.apiSecret}`
+          },
+          timeout: 6e4
+        }
+      );
+      const choice = response.data.choices?.[0];
+      return {
+        content: choice?.message?.content || "",
+        model: this.modelName,
+        usage: response.data.usage ? {
+          promptTokens: response.data.usage.prompt_tokens,
+          completionTokens: response.data.usage.completion_tokens,
+          totalTokens: response.data.usage.total_tokens
+        } : void 0
+      };
+    } catch (error) {
+      console.error("[Spark] API \u8C03\u7528\u5931\u8D25:", error.message);
+      throw new Error(`Spark API \u9519\u8BEF: ${error.response?.data?.error?.message || error.message}`);
+    }
+  }
+  async *streamChatCompletion(messages, options = {}) {
+    const { temperature = 0.7, maxTokens = 2e3 } = options;
+    try {
+      const response = await import_axios5.default.post(
+        this.baseURL,
+        {
+          model: this.modelName,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+          stream: true
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${this.apiKey}:${this.apiSecret}`
+          },
+          timeout: 6e4,
+          responseType: "stream"
+        }
+      );
+      for await (const chunk of response.data) {
+        const lines = chunk.toString().split("\n").filter((line) => line.trim() !== "");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            if (data === "[DONE]") {
+              yield { content: "", done: true };
+              return;
+            }
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content || "";
+              if (content) {
+                yield { content, done: false };
+              }
+            } catch (e) {
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[Spark] \u6D41\u5F0F\u8C03\u7528\u5931\u8D25:", error.message);
+      throw new Error(`Spark \u6D41\u5F0F\u9519\u8BEF: ${error.message}`);
+    }
+  }
+  async healthCheck() {
+    try {
+      await this.chatCompletion([{ role: "user", content: "Hi" }], { maxTokens: 10 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+};
+
 // src/services/ai.ts
 var AIService = class {
   // 1小时缓存
@@ -3672,6 +3770,13 @@ var AIService = class {
    * 初始化所有可用的 AI 模型提供商
    */
   initializeProviders() {
+    const sparkAppId = process.env.SPARK_APP_ID;
+    const sparkApiKey = process.env.SPARK_API_KEY;
+    const sparkApiSecret = process.env.SPARK_API_SECRET;
+    if (sparkAppId && sparkApiKey && sparkApiSecret) {
+      this.providers.set("spark", new SparkProvider(sparkAppId, sparkApiKey, sparkApiSecret));
+      console.log("[AI Service] \u79D1\u5927\u8BAF\u98DE\u661F\u706B\u6A21\u578B\u5DF2\u52A0\u8F7D");
+    }
     const kimiKey = process.env.KIMI_API_KEY;
     if (kimiKey) {
       this.providers.set("kimi", new KimiProvider(kimiKey));
@@ -3809,9 +3914,9 @@ var AIService = class {
   }
 };
 var aiService = new AIService({
-  primaryModel: process.env.PRIMARY_AI_MODEL || "kimi",
-  fallbackModels: ["qianwen", "zhipu", "ernie"].filter(
-    (m) => m !== process.env.PRIMARY_AI_MODEL
+  primaryModel: process.env.PRIMARY_AI_MODEL || "spark",
+  fallbackModels: ["spark", "kimi", "qianwen", "zhipu", "ernie"].filter(
+    (m) => m !== (process.env.PRIMARY_AI_MODEL || "spark")
   ),
   enableCache: process.env.ENABLE_AI_CACHE === "true"
 });

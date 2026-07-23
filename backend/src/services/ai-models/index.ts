@@ -4,4 +4,5 @@ export { KimiProvider } from './kimi';
 export { QianwenProvider } from './qianwen';
 export { ErnieProvider } from './ernie';
 export { ZhipuProvider } from './zhipu';
+export { SparkProvider } from './spark';
 

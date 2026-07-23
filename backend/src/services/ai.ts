@@ -7,12 +7,13 @@ import {
   QianwenProvider,
   ErnieProvider,
   ZhipuProvider,
+  SparkProvider,
 } from './ai-models';
 
 /**
  * AI 模型类型
  */
-export type AIModelType = 'kimi' | 'qianwen' | 'ernie' | 'zhipu';
+export type AIModelType = 'spark' | 'kimi' | 'qianwen' | 'ernie' | 'zhipu';
 
 /**
  * AI 服务配置
@@ -41,6 +42,15 @@ class AIService {
    * 初始化所有可用的 AI 模型提供商
    */
   private initializeProviders() {
+    // 科大讯飞星火大模型
+    const sparkAppId = process.env.SPARK_APP_ID;
+    const sparkApiKey = process.env.SPARK_API_KEY;
+    const sparkApiSecret = process.env.SPARK_API_SECRET;
+    if (sparkAppId && sparkApiKey && sparkApiSecret) {
+      this.providers.set('spark', new SparkProvider(sparkAppId, sparkApiKey, sparkApiSecret));
+      console.log('[AI Service] 科大讯飞星火模型已加载');
+    }
+
     // Kimi (月之暗面)
     const kimiKey = process.env.KIMI_API_KEY;
     if (kimiKey) {
@@ -225,9 +235,9 @@ class AIService {
 
 // 创建 AI 服务单例
 const aiService = new AIService({
-  primaryModel: (process.env.PRIMARY_AI_MODEL as AIModelType) || 'kimi',
-  fallbackModels: ['qianwen', 'zhipu', 'ernie'].filter(
-    m => m !== process.env.PRIMARY_AI_MODEL
+  primaryModel: (process.env.PRIMARY_AI_MODEL as AIModelType) || 'spark',
+  fallbackModels: ['spark', 'kimi', 'qianwen', 'zhipu', 'ernie'].filter(
+    m => m !== (process.env.PRIMARY_AI_MODEL || 'spark')
   ) as AIModelType[],
   enableCache: process.env.ENABLE_AI_CACHE === 'true',
 });
