@@ -25,10 +25,15 @@ export class ContentLoader {
      */
     async loadFile(fileConfig: FileConfig): Promise<ContentFile | null> {
         try {
-            const filePath = path.join(this.projectRoot, fileConfig.path);
+            let filePath = path.join(this.projectRoot, fileConfig.path);
             
             if (!fs.existsSync(filePath)) {
-                console.warn(`⚠️  文件不存在: ${fileConfig.path}`);
+                // 如果找不到，尝试加上 frontend 前缀
+                filePath = path.join(this.projectRoot, 'frontend', fileConfig.path);
+            }
+
+            if (!fs.existsSync(filePath)) {
+                console.warn(`文件不存在: ${fileConfig.path}`);
                 return null;
             }
 
