@@ -9,7 +9,7 @@ export class SparkProvider extends AIModelProvider {
   private appId: string;
   private apiSecret: string;
 
-  constructor(appId: string, apiKey: string, apiSecret: string, modelName: string = 'generalv3.5') {
+  constructor(appId: string, apiKey: string, apiSecret: string, modelName: string = 'generalv3') {
     super(apiKey, 'https://spark-api-open.xf-yun.com/v1/chat/completions', modelName);
     this.appId = appId;
     this.apiSecret = apiSecret;
@@ -21,38 +21,54 @@ export class SparkProvider extends AIModelProvider {
   ): Promise<ChatCompletionResponse> {
     const { temperature = 0.7, maxTokens = 2000 } = options;
 
-    try {
-      const response = await axios.post(
-        this.baseURL,
-        {
-          model: this.modelName,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}:${this.apiSecret}`,
-          },
-          timeout: 60000,
-        }
-      );
+    // 优先使用的模型以及后备兼容模型列表
+    const modelsToTry = [this.modelName, 'generalv3', 'lite'];
+    const uniqueModels = Array.from(new Set(modelsToTry));
 
-      const choice = response.data.choices?.[0];
-      return {
-        content: choice?.message?.content || '',
-        model: this.modelName,
-        usage: response.data.usage ? {
-          promptTokens: response.data.usage.prompt_tokens,
-          completionTokens: response.data.usage.completion_tokens,
-          totalTokens: response.data.usage.total_tokens,
-        } : undefined,
-      };
-    } catch (error: any) {
-      console.error('[Spark] API 调用失败:', error.message);
-      throw new Error(`Spark API 错误: ${error.response?.data?.error?.message || error.message}`);
+    let lastError: any = null;
+
+    for (const model of uniqueModels) {
+      try {
+        const response = await axios.post(
+          this.baseURL,
+          {
+            model: model,
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.apiKey}:${this.apiSecret}`,
+            },
+            timeout: 60000,
+          }
+        );
+
+        // 如果包含 code 且非 0，判定为 API 级别异常
+        if (response.data && response.data.code !== undefined && response.data.code !== 0) {
+          throw new Error(`Spark API 错误代码 ${response.data.code}: ${response.data.message || '模型未授权'}`);
+        }
+
+        const choice = response.data.choices?.[0];
+        return {
+          content: choice?.message?.content || '',
+          model: model,
+          usage: response.data.usage ? {
+            promptTokens: response.data.usage.prompt_tokens,
+            completionTokens: response.data.usage.completion_tokens,
+            totalTokens: response.data.usage.total_tokens,
+          } : undefined,
+        };
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`[Spark] 模型 ${model} 调用失败: ${error.message}，尝试下一个模型...`);
+      }
     }
+
+    console.error('[Spark] 所有模型均尝试失败');
+    throw new Error(`Spark API 错误: ${lastError?.response?.data?.error?.message || lastError?.message || '全部模型调用失败'}`);
   }
 
   async *streamChatCompletion(

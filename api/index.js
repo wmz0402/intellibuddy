@@ -3661,44 +3661,54 @@ var ZhipuProvider = class extends AIModelProvider {
 // src/services/ai-models/spark.ts
 var import_axios5 = __toESM(require("axios"));
 var SparkProvider = class extends AIModelProvider {
-  constructor(appId, apiKey, apiSecret, modelName = "generalv3.5") {
+  constructor(appId, apiKey, apiSecret, modelName = "generalv3") {
     super(apiKey, "https://spark-api-open.xf-yun.com/v1/chat/completions", modelName);
     this.appId = appId;
     this.apiSecret = apiSecret;
   }
   async chatCompletion(messages, options = {}) {
     const { temperature = 0.7, maxTokens = 2e3 } = options;
-    try {
-      const response = await import_axios5.default.post(
-        this.baseURL,
-        {
-          model: this.modelName,
-          messages,
-          temperature,
-          max_tokens: maxTokens
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${this.apiKey}:${this.apiSecret}`
+    const modelsToTry = [this.modelName, "generalv3", "lite"];
+    const uniqueModels = Array.from(new Set(modelsToTry));
+    let lastError = null;
+    for (const model8 of uniqueModels) {
+      try {
+        const response = await import_axios5.default.post(
+          this.baseURL,
+          {
+            model: model8,
+            messages,
+            temperature,
+            max_tokens: maxTokens
           },
-          timeout: 6e4
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${this.apiKey}:${this.apiSecret}`
+            },
+            timeout: 6e4
+          }
+        );
+        if (response.data && response.data.code !== void 0 && response.data.code !== 0) {
+          throw new Error(`Spark API \u9519\u8BEF\u4EE3\u7801 ${response.data.code}: ${response.data.message || "\u6A21\u578B\u672A\u6388\u6743"}`);
         }
-      );
-      const choice = response.data.choices?.[0];
-      return {
-        content: choice?.message?.content || "",
-        model: this.modelName,
-        usage: response.data.usage ? {
-          promptTokens: response.data.usage.prompt_tokens,
-          completionTokens: response.data.usage.completion_tokens,
-          totalTokens: response.data.usage.total_tokens
-        } : void 0
-      };
-    } catch (error) {
-      console.error("[Spark] API \u8C03\u7528\u5931\u8D25:", error.message);
-      throw new Error(`Spark API \u9519\u8BEF: ${error.response?.data?.error?.message || error.message}`);
+        const choice = response.data.choices?.[0];
+        return {
+          content: choice?.message?.content || "",
+          model: model8,
+          usage: response.data.usage ? {
+            promptTokens: response.data.usage.prompt_tokens,
+            completionTokens: response.data.usage.completion_tokens,
+            totalTokens: response.data.usage.total_tokens
+          } : void 0
+        };
+      } catch (error) {
+        lastError = error;
+        console.warn(`[Spark] \u6A21\u578B ${model8} \u8C03\u7528\u5931\u8D25: ${error.message}\uFF0C\u5C1D\u8BD5\u4E0B\u4E00\u4E2A\u6A21\u578B...`);
+      }
     }
+    console.error("[Spark] \u6240\u6709\u6A21\u578B\u5747\u5C1D\u8BD5\u5931\u8D25");
+    throw new Error(`Spark API \u9519\u8BEF: ${lastError?.response?.data?.error?.message || lastError?.message || "\u5168\u90E8\u6A21\u578B\u8C03\u7528\u5931\u8D25"}`);
   }
   async *streamChatCompletion(messages, options = {}) {
     const { temperature = 0.7, maxTokens = 2e3 } = options;
