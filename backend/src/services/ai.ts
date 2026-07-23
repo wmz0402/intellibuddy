@@ -42,10 +42,10 @@ class AIService {
    * 初始化所有可用的 AI 模型提供商
    */
   private initializeProviders() {
-    // 科大讯飞星火大模型
-    const sparkAppId = process.env.SPARK_APP_ID;
-    const sparkApiKey = process.env.SPARK_API_KEY;
-    const sparkApiSecret = process.env.SPARK_API_SECRET;
+    // 科大讯飞星火大模型（支持环境变量与硬编码凭证保底）
+    const sparkAppId = process.env.SPARK_APP_ID || 'd3c1b0f3';
+    const sparkApiKey = process.env.SPARK_API_KEY || 'cc4d24e4a9dcc2b82dc0665409de43f6';
+    const sparkApiSecret = process.env.SPARK_API_SECRET || 'Y2Q1YWMzNWE2M2I0YTM3OWMxZDk2YWQ0';
     if (sparkAppId && sparkApiKey && sparkApiSecret) {
       this.providers.set('spark', new SparkProvider(sparkAppId, sparkApiKey, sparkApiSecret));
       console.log('[AI Service] 科大讯飞星火模型已加载');

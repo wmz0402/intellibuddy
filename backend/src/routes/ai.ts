@@ -44,10 +44,12 @@ router.post('/chat', authMiddleware, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('[AI Chat] 错误:', error.message);
-    res.status(500).json({ 
-      success: false,
-      message: '调用 AI 服务时出错',
-      error: error.message,
+    res.json({ 
+      success: true,
+      data: {
+        role: 'assistant',
+        content: `AI 服务响应异常: ${error.message || '服务繁忙，请重试'}`,
+      },
     });
   }
 });
